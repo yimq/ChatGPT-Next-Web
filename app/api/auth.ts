@@ -65,6 +65,7 @@ export function auth(req: NextRequest) {
     console.log("[Auth] use user api key");
   }
 
+  req.headers.set("accessCode", accessCode);
   return {
     error: false,
   };

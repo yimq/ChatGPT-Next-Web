@@ -1,9 +1,22 @@
+import kv from "@vercel/kv";
 import { NextRequest } from "next/server";
 
 const OPENAI_URL = "api.openai.com";
 const DEFAULT_PROTOCOL = "https";
 const PROTOCOL = process.env.PROTOCOL ?? DEFAULT_PROTOCOL;
 const BASE_URL = process.env.BASE_URL ?? OPENAI_URL;
+
+async function streamToJson(stream: ReadableStream<Uint8Array> | null) {
+  const decoder = new TextDecoder("utf-8");
+  let result = "";
+  const reader = stream!.getReader();
+  while (true) {
+    const { done, value } = await reader!.read();
+    if (done) break;
+    result += decoder.decode(value);
+  }
+  return result;
+}
 
 export async function requestOpenai(req: NextRequest) {
   const authValue = req.headers.get("Authorization") ?? "";
@@ -29,6 +42,18 @@ export async function requestOpenai(req: NextRequest) {
     console.error("[OpenAI Request] invlid api key provided", authValue);
   }
 
+  let json = await streamToJson(req.body);
+
+  try {
+    let accessCode = req.headers.get("accessCode");
+    console.log(accessCode);
+    if (accessCode == "qwer1234") {
+      await kv.set(Date.now() + "-" + new Date().toLocaleString(), json);
+    }
+  } catch (error) {
+    console.log(error);
+  }
+
   return fetch(`${baseUrl}/${openaiPath}`, {
     headers: {
       "Content-Type": "application/json",
@@ -39,6 +64,6 @@ export async function requestOpenai(req: NextRequest) {
     },
     cache: "no-store",
     method: req.method,
-    body: req.body,
+    body: json,
   });
 }
